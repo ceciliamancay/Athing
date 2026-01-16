@@ -9,30 +9,80 @@
 <body>
     <div class="container">
         <header>
-            <h1>Morning Brain Dump</h1>
-            <div class="input-section">
-                <textarea id="brainDumpInput" placeholder="Write your morning brain dump here...
+            <h1>Brain Dump</h1>
+
+            <!-- Mode Selection -->
+            <div class="mode-selection">
+                <button class="mode-btn active" data-mode="morning">☀️ Morning Dump</button>
+                <button class="mode-btn" data-mode="daytime">☁️ Quick Add</button>
+                <button class="mode-btn" data-mode="evening">🌙 Evening Reflection</button>
+            </div>
+
+            <!-- Morning/Daytime Input Section -->
+            <div class="input-section" id="inputSection">
+                <div class="progress-indicator" id="progressIndicator">
+                    <div class="progress-text">Clearing your mind...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+                <textarea id="brainDumpInput" placeholder="Just start writing... get it all out.
 
 Example:
-Need to finish the report by Friday. Also gym today and remember to read for 30 mins.
-Meeting with Sarah at 3pm tomorrow. Buy groceries. Start working on the project proposal next week."></textarea>
-                <button id="parseDumpBtn">Parse & Add</button>
+Oh, I need to remember to look for an Airbnb in Costa Rica on Monday. Also need to book that dentist appointment. Yoga with Carine would be great Monday too."></textarea>
+                <button id="parseDumpBtn" class="btn-primary">Clear My Mind</button>
+            </div>
+
+            <!-- Evening Reflection Section -->
+            <div class="evening-section" id="eveningSection" style="display: none;">
+                <h2>How did today go?</h2>
+                <p class="gentle-prompt">Take a moment to reflect. What did you accomplish?</p>
+
+                <div class="evening-content">
+                    <div class="accomplishments-section">
+                        <h3>Today's Tasks</h3>
+                        <div id="todaysTasks" class="todays-tasks"></div>
+                    </div>
+
+                    <div class="journal-section">
+                        <h3>A few words for today</h3>
+                        <textarea id="journalInput" placeholder="How are you feeling? Any thoughts to capture?
+
+Keep it simple. A few words is enough."></textarea>
+
+                        <div class="reminder-section">
+                            <label for="morningReminder">Tomorrow's reminder (optional):</label>
+                            <input type="text" id="morningReminder" placeholder="Something kind to tell yourself tomorrow">
+                        </div>
+
+                        <button id="completeDay" class="btn-primary">Complete Day</button>
+                    </div>
+                </div>
             </div>
         </header>
 
         <div class="main-content">
             <aside class="sidebar">
-                <div class="section">
-                    <h2>Habit Tracker</h2>
+                <div class="section habit-section">
+                    <h2>Daily Habits</h2>
+                    <p class="section-subtitle">Simple daily check-ins</p>
                     <div id="habitList" class="habit-list">
-                        <!-- Habits will appear here -->
+                        <!-- Fixed habits will appear here -->
                     </div>
                 </div>
 
                 <div class="section">
                     <h2>To-Do List</h2>
+                    <p class="section-subtitle">Tasks for whenever</p>
                     <div id="todoList" class="todo-list">
                         <!-- Tasks will appear here -->
+                    </div>
+                </div>
+
+                <div class="section journal-history">
+                    <h2>Recent Reflections</h2>
+                    <div id="journalHistory" class="journal-entries">
+                        <!-- Journal entries will appear here -->
                     </div>
                 </div>
             </aside>
@@ -60,15 +110,24 @@ Meeting with Sarah at 3pm tomorrow. Buy groceries. Start working on the project 
     <!-- Confirmation Modal -->
     <div id="confirmationModal" class="modal">
         <div class="modal-content">
-            <h2>Confirm Your Items</h2>
-            <p>Review the parsed items and assign them to categories:</p>
+            <h2>Review & Simplify</h2>
+            <p class="modal-subtitle">Edit anything that needs adjusting. Skip what doesn't matter.</p>
             <div id="parsedItems" class="parsed-items">
                 <!-- Parsed items will appear here -->
             </div>
             <div class="modal-actions">
-                <button id="confirmBtn" class="btn-primary">Confirm All</button>
+                <button id="confirmBtn" class="btn-primary">Add to List</button>
                 <button id="cancelBtn" class="btn-secondary">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Reminder Modal -->
+    <div id="reminderModal" class="modal">
+        <div class="modal-content modal-small">
+            <h2>Good morning! 🌅</h2>
+            <div id="reminderMessage" class="reminder-message"></div>
+            <button id="closeReminder" class="btn-primary">Thanks!</button>
         </div>
     </div>
 
