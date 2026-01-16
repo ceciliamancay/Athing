@@ -632,11 +632,128 @@ h1 {
     border-left-color: var(--soft-lavender);
 }
 
+.item-content {
+    margin-bottom: 12px;
+}
+
+.item-text-editable {
+    font-weight: 500;
+    color: var(--calm-text);
+    margin-bottom: 8px;
+    line-height: 1.5;
+    padding: 8px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    cursor: text;
+    min-height: 24px;
+}
+
+.item-text-editable:hover {
+    background: rgba(184, 212, 241, 0.08);
+    border-color: rgba(184, 212, 241, 0.3);
+}
+
+.item-text-editable:focus {
+    outline: none;
+    background: white;
+    border-color: var(--soft-lavender);
+    box-shadow: 0 2px 8px rgba(165, 145, 191, 0.15);
+}
+
+.item-original {
+    font-size: 12px;
+    color: var(--calm-text-light);
+    font-style: italic;
+    padding-left: 8px;
+    border-left: 2px solid rgba(184, 212, 241, 0.3);
+    margin-top: 4px;
+}
+
 .item-text {
     font-weight: 500;
     color: var(--calm-text);
     margin-bottom: 10px;
     line-height: 1.5;
+}
+
+.item-details {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.date-time-picker {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.date-time-picker label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--calm-text);
+    font-weight: 500;
+}
+
+.date-input,
+.time-input {
+    padding: 6px 10px;
+    border: 2px solid rgba(184, 212, 241, 0.3);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--calm-text);
+    background: white;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.date-input:hover,
+.time-input:hover {
+    border-color: var(--soft-blue);
+}
+
+.date-input:focus,
+.time-input:focus {
+    outline: none;
+    border-color: var(--soft-lavender);
+    box-shadow: 0 2px 8px rgba(165, 145, 191, 0.15);
+}
+
+.habit-checkboxes {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+}
+
+.habit-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(155, 201, 164, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--calm-success);
+    transition: all 0.2s ease;
+}
+
+.habit-checkbox:hover {
+    background: rgba(155, 201, 164, 0.2);
+}
+
+.habit-checkbox input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--calm-success);
+    width: 16px;
+    height: 16px;
 }
 
 .item-meta {

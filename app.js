@@ -101,20 +101,31 @@ class BrainDumpApp {
         this.saveData('dumpHistory', this.dumpHistory);
 
         // Split text into sentences/items
-        const sentences = text.split(/[.!?\n]+/).filter(s => s.trim().length > 0);
+        let sentences = text.split(/[.!?\n]+/).filter(s => s.trim().length > 0);
+
+        // Remove filler phrases and non-actionable sentences
+        sentences = sentences.map(s => this.removeFillerPhrases(s.trim()))
+                             .filter(s => s.length > 0)
+                             .filter(s => !this.isNonActionable(s));
+
+        // Combine related sentences with context understanding
+        sentences = this.combineRelatedSentences(sentences);
 
         this.pendingItems = sentences.map((sentence, index) => {
-            const item = sentence.trim();
+            const originalText = sentence.original || sentence;
+            const item = sentence.text || sentence;
             const date = this.parseDate(item);
-            const isHabit = this.isHabit(item);
+            const time = this.parseTime(item);
+            const habitInfo = this.detectHabit(item);
 
             return {
                 id: Date.now() + index,
-                text: item,
+                text: originalText,
                 cleanText: this.cleanItemText(item),
                 date: date,
-                category: this.suggestCategory(item, date, isHabit),
-                isHabit: isHabit,
+                time: time,
+                category: this.suggestCategory(item, date, time, habitInfo),
+                habitInfo: habitInfo,
                 completed: false
             };
         });
@@ -124,22 +135,172 @@ class BrainDumpApp {
         this.renderDumpHistory();
     }
 
-    // Determine if text describes a habit
-    isHabit(text) {
-        const lowerText = text.toLowerCase();
-        const habitKeywords = [
-            'gym', 'workout', 'exercise', 'run', 'jog', 'yoga', 'sport',
-            'read', 'reading', 'book', 'meditate', 'meditation',
-            'practice', 'study', 'learn', 'write', 'journal'
+    // Remove common filler phrases and emotional commentary
+    removeFillerPhrases(text) {
+        const fillerPatterns = [
+            /^(okay|alright|so|um|uh|well|like)\s*,?\s*/i,
+            /\b(I got this|I think|I guess|maybe|perhaps|probably|hopefully)\b/gi,
+            /\b(luckily|unfortunately|sadly|honestly|basically|literally)\b/gi,
+            /\b(you know|I mean|kind of|sort of)\b/gi,
+            /\b(I need to|I should|I have to|I must|I want to|I'd like to|remember to)\b/gi,
+            /\b(gonna|gotta|wanna)\b/gi,
+            /\s+/g  // normalize whitespace
         ];
 
-        return habitKeywords.some(keyword => lowerText.includes(keyword));
+        let cleaned = text;
+        fillerPatterns.forEach(pattern => {
+            if (pattern.source === '\\s+') {
+                cleaned = cleaned.replace(pattern, ' ');
+            } else {
+                cleaned = cleaned.replace(pattern, '');
+            }
+        });
+
+        return cleaned.trim();
+    }
+
+    // Check if sentence is non-actionable (time/day confirmations, etc.)
+    isNonActionable(text) {
+        const lowerText = text.toLowerCase();
+
+        // Time/day confirmations like "it's monday morning" or "today is tuesday"
+        const nonActionablePatterns = [
+            /^(it'?s|today is|this is)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i,
+            /^(it'?s|this is)\s+(morning|afternoon|evening|night)/i,
+            /^(good morning|good afternoon|good evening)/i,
+            /^(hi|hey|hello|yo)\s*$/i
+        ];
+
+        return nonActionablePatterns.some(pattern => pattern.test(lowerText));
+    }
+
+    // Combine related sentences using context understanding
+    combineRelatedSentences(sentences) {
+        const combined = [];
+        let currentContext = null;
+
+        for (let i = 0; i < sentences.length; i++) {
+            const sentence = sentences[i];
+            const lowerSentence = sentence.toLowerCase();
+
+            // Check if this sentence references previous context
+            const hasPronouns = /\b(that|this|it|those|these)\b/.test(lowerSentence);
+            const isShort = sentence.split(' ').length < 5;
+
+            if (hasPronouns && isShort && currentContext) {
+                // Combine with previous sentence
+                const previous = combined[combined.length - 1];
+                const combinedText = `${previous.text} ${sentence}`;
+                combined[combined.length - 1] = {
+                    text: combinedText,
+                    original: `${previous.original}\n${sentence}`
+                };
+            } else {
+                // Start new item
+                combined.push({
+                    text: sentence,
+                    original: sentence
+                });
+                // Update context for next iteration
+                currentContext = sentence;
+            }
+        }
+
+        return combined;
+    }
+
+    // Parse time from text
+    parseTime(text) {
+        const timePatterns = [
+            /\bat\s+(\d{1,2})(:\d{2})?\s*(am|pm)/i,
+            /\b(\d{1,2})(:\d{2})?\s*(am|pm)\b/i,
+            /\bat\s+(\d{1,2})(:\d{2})\b/i
+        ];
+
+        for (let pattern of timePatterns) {
+            const match = text.match(pattern);
+            if (match) {
+                return match[0]; // Return the full time string
+            }
+        }
+
+        return null;
+    }
+
+    // Detect specific habits and categorize workout mentions
+    detectHabit(text) {
+        const lowerText = text.toLowerCase();
+
+        // Fixed daily habits: Meds, Cat Teeth, Sports, Read
+        const fixedHabits = {
+            meds: /\b(meds?|medication|pill|prescription)\b/i,
+            catTeeth: /\b(cat'?s?\s*(teeth|tooth|dental|brush))\b/i,
+            sports: /\b(sports?|gym|workout|exercise|yoga|running?|jog|swim|bike|cycling)\b/i,
+            read: /\b(read|reading|book)\b/i
+        };
+
+        const detected = {
+            isFixedHabit: false,
+            habitType: null,
+            isWorkout: false
+        };
+
+        // Check for fixed habits
+        for (let [habitType, pattern] of Object.entries(fixedHabits)) {
+            if (pattern.test(lowerText)) {
+                detected.isFixedHabit = true;
+                detected.habitType = habitType;
+
+                // Special case: sports/workout mentions
+                if (habitType === 'sports') {
+                    detected.isWorkout = true;
+                }
+                break;
+            }
+        }
+
+        return detected;
+    }
+
+    // Determine if text describes a habit (legacy method, keeping for compatibility)
+    isHabit(text) {
+        const habitInfo = this.detectHabit(text);
+        return habitInfo.isFixedHabit;
     }
 
     // Suggest a category based on the text
-    suggestCategory(text, date, isHabit) {
-        if (isHabit) return 'habit';
-        if (date) return 'calendar';
+    suggestCategory(text, date, time, habitInfo) {
+        const lowerText = text.toLowerCase();
+
+        // Check for specific timed events (meetings, classes, appointments)
+        const timedEventKeywords = /\b(meeting|class|appointment|call|conference|session|lecture)\b/i;
+        if (timedEventKeywords.test(lowerText) && (date || time)) {
+            return 'calendar';
+        }
+
+        // Workouts/exercises logic:
+        // - If there's a time → Calendar
+        // - If no time → To-Do
+        // - Sports habit will be checked separately in the UI
+        if (habitInfo.isWorkout) {
+            if (time || date) {
+                return 'calendar';
+            } else {
+                return 'todo';
+            }
+        }
+
+        // Fixed daily habits (Meds, Cat Teeth, Sports, Read) → Habits
+        if (habitInfo.isFixedHabit && habitInfo.habitType !== 'sports') {
+            return 'habit';
+        }
+
+        // Events with dates/times → Calendar
+        if (date || time) {
+            return 'calendar';
+        }
+
+        // Everything else → To-Do
         return 'todo';
     }
 
@@ -262,21 +423,29 @@ class BrainDumpApp {
         return null;
     }
 
-    // Clean up item text
+    // Clean up item text - remove date/time info and unnecessary words
     cleanItemText(text) {
         let cleaned = text;
 
         // Remove common date patterns
         cleaned = cleaned.replace(/\b(today|tomorrow|yesterday)\b/gi, '');
         cleaned = cleaned.replace(/\b(next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|week)\b/gi, '');
-        cleaned = cleaned.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\b/gi, '');
-        cleaned = cleaned.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b/gi, '');
+        cleaned = cleaned.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(st|nd|rd|th)?\b/gi, '');
+        cleaned = cleaned.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}(st|nd|rd|th)?\b/gi, '');
         cleaned = cleaned.replace(/\d{1,2}\/\d{1,2}\/\d{4}/g, '');
         cleaned = cleaned.replace(/\d{1,2}-\d{1,2}-\d{4}/g, '');
         cleaned = cleaned.replace(/\d{4}-\d{1,2}-\d{1,2}/g, '');
         cleaned = cleaned.replace(/\bin \d+ (day|days|week|weeks)\b/gi, '');
         cleaned = cleaned.replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/gi, '');
-        cleaned = cleaned.replace(/\bby\s+/gi, '');
+        cleaned = cleaned.replace(/\b(by|before|after)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '');
+
+        // Remove unnecessary leading phrases (these should have been removed by removeFillerPhrases, but double check)
+        cleaned = cleaned.replace(/^(I need to|I should|I have to|I must|I want to|I'd like to|remember to)\s+/gi, '');
+
+        // Capitalize first letter
+        if (cleaned.length > 0) {
+            cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        }
 
         // Clean up whitespace
         cleaned = cleaned.replace(/\s+/g, ' ');
@@ -285,42 +454,188 @@ class BrainDumpApp {
         return cleaned;
     }
 
-    // Show confirmation modal
+    // Show confirmation modal with editing capabilities
     showConfirmationModal() {
         const modal = document.getElementById('confirmationModal');
         const container = document.getElementById('parsedItems');
 
-        container.innerHTML = this.pendingItems.map(item => `
-            <div class="parsed-item">
-                <div class="item-text">${this.escapeHtml(item.cleanText)}</div>
-                <div class="item-meta">
-                    ${item.date ? `<span class="date-tag">${this.formatDate(item.date)}</span>` : ''}
+        container.innerHTML = this.pendingItems.map(item => {
+            const showDatePicker = item.category === 'calendar' || item.date;
+            const showTimePicker = item.category === 'calendar' || item.time;
+
+            // Format date for input field
+            let dateValue = '';
+            if (item.date) {
+                const d = new Date(item.date);
+                dateValue = d.toISOString().split('T')[0];
+            }
+
+            // Extract time value
+            let timeValue = '';
+            if (item.time) {
+                // Parse time string like "3pm" or "3:00pm" to 24-hour format
+                timeValue = this.parseTimeToValue(item.time);
+            }
+
+            // Build habit checkboxes HTML
+            let habitCheckboxes = '';
+            if (item.habitInfo.isWorkout) {
+                habitCheckboxes = `
+                    <div class="habit-checkboxes">
+                        <label class="habit-checkbox">
+                            <input type="checkbox" data-habit="sports" checked>
+                            Sports
+                        </label>
+                    </div>
+                `;
+            } else if (item.habitInfo.isFixedHabit) {
+                const habitLabels = {
+                    meds: 'Meds',
+                    catTeeth: 'Cat Teeth',
+                    sports: 'Sports',
+                    read: 'Read'
+                };
+                habitCheckboxes = `
+                    <div class="habit-checkboxes">
+                        <label class="habit-checkbox">
+                            <input type="checkbox" data-habit="${item.habitInfo.habitType}" checked>
+                            ${habitLabels[item.habitInfo.habitType]}
+                        </label>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="parsed-item" data-item-id="${item.id}">
+                    <div class="item-content">
+                        <div class="item-text-editable" contenteditable="true" data-item-id="${item.id}">
+                            ${this.escapeHtml(item.cleanText)}
+                        </div>
+                        <div class="item-original">${this.escapeHtml(item.text)}</div>
+                    </div>
+
+                    <div class="item-details">
+                        ${showDatePicker ? `
+                            <div class="date-time-picker">
+                                <label>
+                                    Date:
+                                    <input type="date"
+                                           class="date-input"
+                                           data-item-id="${item.id}"
+                                           value="${dateValue}">
+                                </label>
+                                ${showTimePicker ? `
+                                    <label>
+                                        Time:
+                                        <input type="time"
+                                               class="time-input"
+                                               data-item-id="${item.id}"
+                                               value="${timeValue}">
+                                    </label>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+
+                        ${habitCheckboxes}
+                    </div>
+
+                    <div class="category-selector">
+                        <label>
+                            <input type="radio"
+                                   name="category-${item.id}"
+                                   value="todo"
+                                   ${item.category === 'todo' ? 'checked' : ''}
+                                   onchange="app.updateItemCategory(${item.id}, 'todo')">
+                            To-Do
+                        </label>
+                        <label>
+                            <input type="radio"
+                                   name="category-${item.id}"
+                                   value="habit"
+                                   ${item.category === 'habit' ? 'checked' : ''}
+                                   onchange="app.updateItemCategory(${item.id}, 'habit')">
+                            Habit
+                        </label>
+                        <label>
+                            <input type="radio"
+                                   name="category-${item.id}"
+                                   value="calendar"
+                                   ${item.category === 'calendar' ? 'checked' : ''}
+                                   onchange="app.updateItemCategory(${item.id}, 'calendar')">
+                            Calendar
+                        </label>
+                        <label>
+                            <input type="radio"
+                                   name="category-${item.id}"
+                                   value="skip"
+                                   onchange="app.updateItemCategory(${item.id}, 'skip')">
+                            Skip
+                        </label>
+                    </div>
                 </div>
-                <div class="category-selector">
-                    <label>
-                        <input type="radio" name="category-${item.id}" value="todo"
-                               ${item.category === 'todo' ? 'checked' : ''}>
-                        To-Do
-                    </label>
-                    <label>
-                        <input type="radio" name="category-${item.id}" value="habit"
-                               ${item.category === 'habit' ? 'checked' : ''}>
-                        Habit
-                    </label>
-                    <label>
-                        <input type="radio" name="category-${item.id}" value="calendar"
-                               ${item.category === 'calendar' ? 'checked' : ''}>
-                        Calendar
-                    </label>
-                    <label>
-                        <input type="radio" name="category-${item.id}" value="skip">
-                        Skip
-                    </label>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         modal.style.display = 'flex';
+    }
+
+    // Parse time string to value for input field
+    parseTimeToValue(timeStr) {
+        const match = timeStr.match(/(\d{1,2})(:\d{2})?\s*(am|pm)?/i);
+        if (!match) return '';
+
+        let hours = parseInt(match[1]);
+        const minutes = match[2] ? match[2].substring(1) : '00';
+        const period = match[3] ? match[3].toLowerCase() : null;
+
+        if (period === 'pm' && hours < 12) hours += 12;
+        if (period === 'am' && hours === 12) hours = 0;
+
+        return `${hours.toString().padStart(2, '0')}:${minutes}`;
+    }
+
+    // Update item category when radio button changes
+    updateItemCategory(itemId, category) {
+        const item = this.pendingItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        item.category = category;
+
+        // Show/hide date/time pickers based on category
+        const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+        const detailsSection = itemElement.querySelector('.item-details');
+
+        if (category === 'calendar') {
+            // Add date/time pickers if not present
+            if (!detailsSection.querySelector('.date-time-picker')) {
+                const dateValue = item.date ? new Date(item.date).toISOString().split('T')[0] : '';
+                const timeValue = item.time ? this.parseTimeToValue(item.time) : '';
+
+                const pickerHtml = `
+                    <div class="date-time-picker">
+                        <label>
+                            Date:
+                            <input type="date"
+                                   class="date-input"
+                                   data-item-id="${itemId}"
+                                   value="${dateValue}">
+                        </label>
+                        <label>
+                            Time:
+                            <input type="time"
+                                   class="time-input"
+                                   data-item-id="${itemId}"
+                                   value="${timeValue}">
+                        </label>
+                    </div>
+                `;
+                detailsSection.insertAdjacentHTML('afterbegin', pickerHtml);
+            }
+        } else {
+            // Remove date/time pickers if present
+            const picker = detailsSection.querySelector('.date-time-picker');
+            if (picker) picker.remove();
+        }
     }
 
     closeModal() {
@@ -329,29 +644,53 @@ class BrainDumpApp {
     }
 
     confirmItems() {
-        // Get selected categories for each item
+        // Get selected categories and edited values for each item
         this.pendingItems.forEach(item => {
             const selectedCategory = document.querySelector(`input[name="category-${item.id}"]:checked`);
             if (selectedCategory && selectedCategory.value !== 'skip') {
                 const category = selectedCategory.value;
 
+                // Get edited text
+                const editableElement = document.querySelector(`[data-item-id="${item.id}"][contenteditable]`);
+                const editedText = editableElement ? editableElement.textContent.trim() : item.cleanText;
+
+                // Get date/time if calendar item
+                let finalDate = item.date;
+                if (category === 'calendar') {
+                    const dateInput = document.querySelector(`.date-input[data-item-id="${item.id}"]`);
+                    const timeInput = document.querySelector(`.time-input[data-item-id="${item.id}"]`);
+
+                    if (dateInput && dateInput.value) {
+                        finalDate = new Date(dateInput.value);
+
+                        // Add time if specified
+                        if (timeInput && timeInput.value) {
+                            const [hours, minutes] = timeInput.value.split(':');
+                            finalDate.setHours(parseInt(hours), parseInt(minutes));
+                        }
+                    } else {
+                        finalDate = finalDate || new Date();
+                    }
+                }
+
+                // Handle category-specific logic
                 if (category === 'todo') {
                     this.todos.push({
                         id: item.id,
-                        text: item.cleanText,
+                        text: editedText,
                         completed: false,
                         created: new Date().toISOString()
                     });
                 } else if (category === 'habit') {
                     // Check if habit already exists
                     const existingHabit = this.habits.find(h =>
-                        h.text.toLowerCase() === item.cleanText.toLowerCase()
+                        h.text.toLowerCase() === editedText.toLowerCase()
                     );
 
                     if (!existingHabit) {
                         this.habits.push({
                             id: item.id,
-                            text: item.cleanText,
+                            text: editedText,
                             completions: {},
                             created: new Date().toISOString()
                         });
@@ -359,12 +698,43 @@ class BrainDumpApp {
                 } else if (category === 'calendar') {
                     this.calendarItems.push({
                         id: item.id,
-                        text: item.cleanText,
-                        date: item.date ? item.date.toISOString() : new Date().toISOString(),
+                        text: editedText,
+                        date: finalDate ? finalDate.toISOString() : new Date().toISOString(),
                         completed: false,
                         created: new Date().toISOString()
                     });
                 }
+
+                // Handle habit checkboxes (for fixed habits like Sports, Meds, etc.)
+                const itemElement = document.querySelector(`[data-item-id="${item.id}"]`);
+                const habitCheckboxes = itemElement.querySelectorAll('.habit-checkbox input[type="checkbox"]:checked');
+
+                habitCheckboxes.forEach(checkbox => {
+                    const habitType = checkbox.dataset.habit;
+                    const habitLabels = {
+                        meds: 'Meds',
+                        catTeeth: 'Cat Teeth',
+                        sports: 'Sports',
+                        read: 'Read'
+                    };
+
+                    const habitText = habitLabels[habitType];
+                    if (habitText) {
+                        // Check if this habit already exists
+                        const existingHabit = this.habits.find(h =>
+                            h.text.toLowerCase() === habitText.toLowerCase()
+                        );
+
+                        if (!existingHabit) {
+                            this.habits.push({
+                                id: Date.now() + Math.random(),
+                                text: habitText,
+                                completions: {},
+                                created: new Date().toISOString()
+                            });
+                        }
+                    }
+                });
             }
         });
 
