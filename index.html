@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager & Calendar</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Task Manager</h1>
+            <div class="input-section">
+                <input type="text" id="taskInput" placeholder="Enter a task... (e.g., 'Finish report tomorrow - high stress')">
+                <button id="addTaskBtn">Add Task</button>
+            </div>
+            <div class="legend">
+                <span class="legend-item"><span class="dot low"></span> Low Stress</span>
+                <span class="legend-item"><span class="dot medium"></span> Medium Stress</span>
+                <span class="legend-item"><span class="dot high"></span> High Stress</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <h2>To-Do List</h2>
+                <div id="todoList" class="todo-list">
+                    <!-- Undated tasks will appear here -->
+                </div>
+            </aside>
+
+            <main class="calendar-section">
+                <div class="calendar-header">
+                    <button id="prevMonth">&lt;</button>
+                    <h2 id="currentMonth"></h2>
+                    <button id="nextMonth">&gt;</button>
+                </div>
+                <div class="calendar-grid" id="calendar">
+                    <!-- Calendar will be generated here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
