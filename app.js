@@ -1,4 +1,4 @@
-// Morning Brain Dump Application
+// Brain Clarity Application - Calm, Anxiety-Friendly Design
 class BrainDumpApp {
     constructor() {
         this.todos = this.loadData('todos') || [];
@@ -7,12 +7,60 @@ class BrainDumpApp {
         this.dumpHistory = this.loadData('dumpHistory') || [];
         this.currentDate = new Date();
         this.pendingItems = [];
+        this.currentTimeOfDay = this.loadData('timeOfDay') || this.detectTimeOfDay();
         this.init();
     }
 
     init() {
+        this.setTimeOfDay(this.currentTimeOfDay);
+        this.updateGreeting();
         this.renderAll();
         this.setupEventListeners();
+    }
+
+    // Detect time of day based on current hour
+    detectTimeOfDay() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) {
+            return 'morning';
+        } else if (hour >= 12 && hour < 18) {
+            return 'day';
+        } else {
+            return 'evening';
+        }
+    }
+
+    // Set time of day and apply corresponding styles
+    setTimeOfDay(timeOfDay) {
+        this.currentTimeOfDay = timeOfDay;
+        this.saveData('timeOfDay', timeOfDay);
+
+        // Remove all time classes
+        document.body.classList.remove('time-morning', 'time-day', 'time-evening');
+
+        // Add the current time class
+        document.body.classList.add(`time-${timeOfDay}`);
+
+        // Update active button
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.time === timeOfDay) {
+                btn.classList.add('active');
+            }
+        });
+
+        this.updateGreeting();
+    }
+
+    // Update greeting based on time of day
+    updateGreeting() {
+        const greetingEl = document.getElementById('greeting');
+        const greetings = {
+            morning: 'Good Morning ☀️',
+            day: 'Taking a Break? 🌤️',
+            evening: 'Winding Down 🌙'
+        };
+        greetingEl.textContent = greetings[this.currentTimeOfDay] || 'Brain Clarity';
     }
 
     setupEventListeners() {
@@ -21,6 +69,13 @@ class BrainDumpApp {
         document.getElementById('nextMonth').addEventListener('click', () => this.changeMonth(1));
         document.getElementById('confirmBtn').addEventListener('click', () => this.confirmItems());
         document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal());
+
+        // Time switcher buttons
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.setTimeOfDay(btn.dataset.time);
+            });
+        });
 
         // Close modal when clicking outside
         document.getElementById('confirmationModal').addEventListener('click', (e) => {
@@ -394,7 +449,7 @@ class BrainDumpApp {
         const activeTodos = this.todos.filter(t => !t.completed);
 
         if (activeTodos.length === 0) {
-            container.innerHTML = '<div class="empty-state">No tasks yet</div>';
+            container.innerHTML = '<div class="empty-state">Your mind is clear right now 🌸</div>';
             return;
         }
 
@@ -414,7 +469,7 @@ class BrainDumpApp {
         const today = new Date().toISOString().split('T')[0];
 
         if (this.habits.length === 0) {
-            container.innerHTML = '<div class="empty-state">No habits yet</div>';
+            container.innerHTML = '<div class="empty-state">Ready to build something new? ✨</div>';
             return;
         }
 
@@ -506,7 +561,7 @@ class BrainDumpApp {
         const container = document.getElementById('dumpHistory');
 
         if (this.dumpHistory.length === 0) {
-            container.innerHTML = '<div class="empty-state">No history yet</div>';
+            container.innerHTML = '<div class="empty-state">Your thoughts will gather here 💭</div>';
             return;
         }
 

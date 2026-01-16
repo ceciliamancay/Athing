@@ -7,30 +7,52 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Sky Background with Sun/Moon Animation -->
+    <div class="sky-background">
+        <div class="celestial-body"></div>
+    </div>
+
     <div class="container">
         <header>
-            <h1>Morning Brain Dump</h1>
+            <div class="header-top">
+                <h1 id="greeting">Brain Clarity</h1>
+                <div class="time-switcher">
+                    <button class="time-btn" data-time="morning" title="Morning">
+                        <span class="time-icon">🌅</span>
+                    </button>
+                    <button class="time-btn" data-time="day" title="Daytime">
+                        <span class="time-icon">☀️</span>
+                    </button>
+                    <button class="time-btn" data-time="evening" title="Evening">
+                        <span class="time-icon">🌙</span>
+                    </button>
+                </div>
+            </div>
             <div class="input-section">
-                <textarea id="brainDumpInput" placeholder="Write your morning brain dump here...
+                <textarea id="brainDumpInput" placeholder="Take a moment to clear your mind... write whatever comes to you.
 
-Example:
-Need to finish the report by Friday. Also gym today and remember to read for 30 mins.
-Meeting with Sarah at 3pm tomorrow. Buy groceries. Start working on the project proposal next week."></textarea>
-                <button id="parseDumpBtn">Parse & Add</button>
+For example:
+• Finish the report by Friday
+• Gym session today, maybe 30 minutes of reading
+• Coffee with Sarah at 3pm tomorrow
+• Remember to pick up groceries"></textarea>
+                <button id="parseDumpBtn">✨ Let's organize this</button>
             </div>
         </header>
 
         <div class="main-content">
             <aside class="sidebar">
                 <div class="section">
-                    <h2>Habit Tracker</h2>
+                    <h2>✨ Daily Habits</h2>
+                    <p class="section-subtitle">Small steps, big progress</p>
                     <div id="habitList" class="habit-list">
                         <!-- Habits will appear here -->
                     </div>
                 </div>
 
                 <div class="section">
-                    <h2>To-Do List</h2>
+                    <h2>📝 Tasks</h2>
+                    <p class="section-subtitle">One thing at a time</p>
                     <div id="todoList" class="todo-list">
                         <!-- Tasks will appear here -->
                     </div>
@@ -50,7 +72,8 @@ Meeting with Sarah at 3pm tomorrow. Buy groceries. Start working on the project 
         </div>
 
         <div class="history-section">
-            <h3>Brain Dump History</h3>
+            <h3>💭 Your Previous Thoughts</h3>
+            <p class="history-subtitle">It's okay to look back</p>
             <div id="dumpHistory" class="dump-history">
                 <!-- History will appear here -->
             </div>
@@ -60,14 +83,14 @@ Meeting with Sarah at 3pm tomorrow. Buy groceries. Start working on the project 
     <!-- Confirmation Modal -->
     <div id="confirmationModal" class="modal">
         <div class="modal-content">
-            <h2>Confirm Your Items</h2>
-            <p>Review the parsed items and assign them to categories:</p>
+            <h2>✨ Let's organize your thoughts</h2>
+            <p>Take your time reviewing these. You can adjust any categories that don't feel right.</p>
             <div id="parsedItems" class="parsed-items">
                 <!-- Parsed items will appear here -->
             </div>
             <div class="modal-actions">
-                <button id="confirmBtn" class="btn-primary">Confirm All</button>
-                <button id="cancelBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmBtn" class="btn-primary">Looks good ✓</button>
+                <button id="cancelBtn" class="btn-secondary">Not yet</button>
             </div>
         </div>
     </div>
