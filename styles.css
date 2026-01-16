@@ -33,20 +33,24 @@ h1 {
 
 .input-section {
     display: flex;
+    flex-direction: column;
     gap: 10px;
-    margin-bottom: 15px;
 }
 
-#taskInput {
-    flex: 1;
+#brainDumpInput {
+    width: 100%;
+    min-height: 150px;
     padding: 15px;
     border: none;
     border-radius: 10px;
     font-size: 16px;
+    font-family: inherit;
+    resize: vertical;
     outline: none;
 }
 
-#addTaskBtn {
+#parseDumpBtn {
+    align-self: flex-end;
     padding: 15px 30px;
     background: #4CAF50;
     color: white;
@@ -58,116 +62,102 @@ h1 {
     transition: background 0.3s;
 }
 
-#addTaskBtn:hover {
+#parseDumpBtn:hover {
     background: #45a049;
-}
-
-.legend {
-    display: flex;
-    gap: 20px;
-    font-size: 14px;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.dot.low {
-    background: #4CAF50;
-}
-
-.dot.medium {
-    background: #FF9800;
-}
-
-.dot.high {
-    background: #f44336;
 }
 
 .main-content {
     display: flex;
-    min-height: 600px;
+    min-height: 500px;
 }
 
 .sidebar {
-    width: 300px;
+    width: 350px;
     background: #f5f5f5;
     padding: 20px;
     border-right: 2px solid #ddd;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
-.sidebar h2 {
-    margin-bottom: 20px;
+.section {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.section h2 {
+    margin-bottom: 15px;
     color: #333;
-    font-size: 1.5em;
+    font-size: 1.3em;
 }
 
+.habit-list,
 .todo-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-.task-item {
-    padding: 12px;
-    background: white;
+.habit-item,
+.todo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #f9f9f9;
     border-radius: 8px;
-    border-left: 4px solid;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 3px solid #667eea;
+    transition: transform 0.2s;
     position: relative;
 }
 
-.task-item:hover {
-    transform: translateX(5px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.habit-item:hover,
+.todo-item:hover {
+    transform: translateX(3px);
 }
 
-.task-item.low {
-    border-left-color: #4CAF50;
+.habit-item input[type="checkbox"],
+.todo-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
 }
 
-.task-item.medium {
-    border-left-color: #FF9800;
-}
-
-.task-item.high {
-    border-left-color: #f44336;
-}
-
-.task-item .task-text {
+.habit-item label,
+.todo-item label {
+    flex: 1;
+    cursor: pointer;
     font-size: 14px;
     color: #333;
-    word-wrap: break-word;
 }
 
-.task-item .delete-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
+.habit-item input[type="checkbox"]:checked + label,
+.todo-item input[type="checkbox"]:checked + label {
+    text-decoration: line-through;
+    color: #999;
+}
+
+.delete-btn {
     background: #f44336;
     color: white;
     border: none;
     border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 12px;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
     cursor: pointer;
     opacity: 0;
     transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.task-item:hover .delete-btn {
+.habit-item:hover .delete-btn,
+.todo-item:hover .delete-btn {
     opacity: 1;
 }
 
@@ -225,7 +215,6 @@ h1 {
     padding: 8px;
     background: white;
     transition: background 0.2s;
-    position: relative;
 }
 
 .calendar-day:hover {
@@ -248,27 +237,88 @@ h1 {
     background: #f0f4ff;
 }
 
-.calendar-day .day-tasks {
+.calendar-day .day-items {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-top: 5px;
+    gap: 5px;
 }
 
-.calendar-day .task-item {
-    padding: 6px;
-    font-size: 12px;
-    margin: 0;
+.calendar-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px;
+    background: #f9f9f9;
+    border-radius: 5px;
+    border-left: 3px solid #FF9800;
+    font-size: 11px;
+    position: relative;
 }
 
-.calendar-day .task-item .task-text {
+.calendar-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.calendar-item label {
+    flex: 1;
+    cursor: pointer;
     font-size: 11px;
 }
 
-.calendar-day .task-item .delete-btn {
+.calendar-item.completed label {
+    text-decoration: line-through;
+    color: #999;
+}
+
+.calendar-item .delete-btn {
     width: 16px;
     height: 16px;
     font-size: 10px;
+}
+
+.calendar-item:hover .delete-btn {
+    opacity: 1;
+}
+
+.history-section {
+    background: #f5f5f5;
+    border-top: 2px solid #ddd;
+    padding: 15px 30px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.history-section h3 {
+    font-size: 1em;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.dump-history {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dump-entry {
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.dump-date {
+    font-weight: bold;
+    color: #667eea;
+    margin-bottom: 5px;
+    font-size: 11px;
+}
+
+.dump-text {
+    color: #666;
+    line-height: 1.4;
 }
 
 .empty-state {
@@ -276,6 +326,127 @@ h1 {
     color: #999;
     padding: 20px;
     font-style: italic;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-content h2 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.modal-content p {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.parsed-items {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.parsed-item {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.item-text {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.item-meta {
+    margin-bottom: 10px;
+}
+
+.date-tag {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.category-selector {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.category-selector label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+}
+
+.category-selector input[type="radio"] {
+    cursor: pointer;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #45a049;
+}
+
+.btn-secondary {
+    background: #ddd;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #ccc;
 }
 
 @media (max-width: 768px) {
@@ -296,5 +467,14 @@ h1 {
     .calendar-day {
         min-height: 80px;
         padding: 5px;
+    }
+
+    .modal-content {
+        padding: 20px;
+    }
+
+    .category-selector {
+        flex-direction: column;
+        gap: 8px;
     }
 }
