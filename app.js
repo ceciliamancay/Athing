@@ -1,27 +1,94 @@
-// Task Manager Application
-class TaskManager {
+// Morning Brain Dump Application
+class BrainDumpApp {
     constructor() {
-        this.tasks = this.loadTasks();
+        this.todos = this.loadData('todos') || [];
+        this.habits = this.loadData('habits') || [];
+        this.calendarItems = this.loadData('calendarItems') || [];
+        this.dumpHistory = this.loadData('dumpHistory') || [];
         this.currentDate = new Date();
+        this.pendingItems = [];
         this.init();
     }
 
     init() {
-        this.renderCalendar();
-        this.renderTodoList();
+        this.renderAll();
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        document.getElementById('addTaskBtn').addEventListener('click', () => this.addTask());
-        document.getElementById('taskInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.addTask();
-        });
+        document.getElementById('parseDumpBtn').addEventListener('click', () => this.parseBrainDump());
         document.getElementById('prevMonth').addEventListener('click', () => this.changeMonth(-1));
         document.getElementById('nextMonth').addEventListener('click', () => this.changeMonth(1));
+        document.getElementById('confirmBtn').addEventListener('click', () => this.confirmItems());
+        document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal());
+
+        // Close modal when clicking outside
+        document.getElementById('confirmationModal').addEventListener('click', (e) => {
+            if (e.target.id === 'confirmationModal') {
+                this.closeModal();
+            }
+        });
     }
 
-    // Natural language date parser
+    // Parse the brain dump text into structured items
+    parseBrainDump() {
+        const input = document.getElementById('brainDumpInput');
+        const text = input.value.trim();
+
+        if (!text) return;
+
+        // Save to history
+        this.dumpHistory.unshift({
+            id: Date.now(),
+            date: new Date().toISOString(),
+            text: text
+        });
+        this.saveData('dumpHistory', this.dumpHistory);
+
+        // Split text into sentences/items
+        const sentences = text.split(/[.!?\n]+/).filter(s => s.trim().length > 0);
+
+        this.pendingItems = sentences.map((sentence, index) => {
+            const item = sentence.trim();
+            const date = this.parseDate(item);
+            const isHabit = this.isHabit(item);
+
+            return {
+                id: Date.now() + index,
+                text: item,
+                cleanText: this.cleanItemText(item),
+                date: date,
+                category: this.suggestCategory(item, date, isHabit),
+                isHabit: isHabit,
+                completed: false
+            };
+        });
+
+        this.showConfirmationModal();
+        input.value = '';
+        this.renderDumpHistory();
+    }
+
+    // Determine if text describes a habit
+    isHabit(text) {
+        const lowerText = text.toLowerCase();
+        const habitKeywords = [
+            'gym', 'workout', 'exercise', 'run', 'jog', 'yoga', 'sport',
+            'read', 'reading', 'book', 'meditate', 'meditation',
+            'practice', 'study', 'learn', 'write', 'journal'
+        ];
+
+        return habitKeywords.some(keyword => lowerText.includes(keyword));
+    }
+
+    // Suggest a category based on the text
+    suggestCategory(text, date, isHabit) {
+        if (isHabit) return 'habit';
+        if (date) return 'calendar';
+        return 'todo';
+    }
+
+    // Natural language date parser (reusing existing logic)
     parseDate(text) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -47,7 +114,7 @@ class TaskManager {
             return yesterday;
         }
 
-        // Next/This week day names
+        // Day names
         const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const dayMatch = dayNames.find(day => lowerText.includes(day));
         if (dayMatch) {
@@ -64,6 +131,13 @@ class TaskManager {
             return result;
         }
 
+        // Time patterns (e.g., "3pm", "3:00", "15:00")
+        const timeMatch = text.match(/(\d{1,2})(:\d{2})?\s*(am|pm)?/i);
+        if (timeMatch && lowerText.includes('at')) {
+            // This is likely a calendar event with time
+            return today; // Default to today if time but no date specified
+        }
+
         // Next week
         if (lowerText.includes('next week')) {
             const nextWeek = new Date(today);
@@ -71,7 +145,7 @@ class TaskManager {
             return nextWeek;
         }
 
-        // Month names with day numbers (e.g., "Jan 15", "January 15")
+        // Month names with day numbers
         const monthNames = [
             'january', 'february', 'march', 'april', 'may', 'june',
             'july', 'august', 'september', 'october', 'november', 'december'
@@ -86,7 +160,6 @@ class TaskManager {
                 const year = today.getFullYear();
                 const date = new Date(year, i, day);
 
-                // If the date has passed this year, assume next year
                 if (date < today) {
                     date.setFullYear(year + 1);
                 }
@@ -94,11 +167,11 @@ class TaskManager {
             }
         }
 
-        // Specific date formats: MM/DD/YYYY, MM-DD-YYYY, YYYY-MM-DD
+        // Date formats
         const datePatterns = [
-            /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // MM/DD/YYYY
-            /(\d{1,2})-(\d{1,2})-(\d{4})/,    // MM-DD-YYYY
-            /(\d{4})-(\d{1,2})-(\d{1,2})/     // YYYY-MM-DD
+            /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+            /(\d{1,2})-(\d{1,2})-(\d{4})/,
+            /(\d{4})-(\d{1,2})-(\d{1,2})/
         ];
 
         for (let pattern of datePatterns) {
@@ -106,10 +179,8 @@ class TaskManager {
             if (match) {
                 let year, month, day;
                 if (pattern === datePatterns[2]) {
-                    // YYYY-MM-DD
                     [, year, month, day] = match;
                 } else {
-                    // MM/DD/YYYY or MM-DD-YYYY
                     [, month, day, year] = match;
                 }
                 return new Date(year, parseInt(month) - 1, day);
@@ -136,44 +207,8 @@ class TaskManager {
         return null;
     }
 
-    // Flexible stress level parser - groups similar stress descriptors
-    parseStressLevel(text) {
-        const lowerText = text.toLowerCase();
-
-        // High stress keywords
-        const highStress = ['high', 'urgent', 'critical', 'emergency', 'crucial', 'vital',
-                           'stressful', 'panic', 'extreme', 'severe', 'intense', 'overwhelming',
-                           'difficult', 'hard', 'challenging', 'demanding'];
-
-        // Medium stress keywords
-        const mediumStress = ['medium', 'moderate', 'normal', 'average', 'standard',
-                             'regular', 'important', 'some', 'ok', 'okay'];
-
-        // Low stress keywords
-        const lowStress = ['low', 'easy', 'simple', 'light', 'minor', 'trivial',
-                          'relaxed', 'calm', 'chill', 'casual', 'quick', 'routine'];
-
-        // Check for high stress
-        if (highStress.some(keyword => lowerText.includes(keyword))) {
-            return 'high';
-        }
-
-        // Check for medium stress
-        if (mediumStress.some(keyword => lowerText.includes(keyword))) {
-            return 'medium';
-        }
-
-        // Check for low stress
-        if (lowStress.some(keyword => lowerText.includes(keyword))) {
-            return 'low';
-        }
-
-        // Default to medium if no stress level specified
-        return 'medium';
-    }
-
-    // Remove date and stress keywords from task text
-    cleanTaskText(text) {
+    // Clean up item text
+    cleanItemText(text) {
         let cleaned = text;
 
         // Remove common date patterns
@@ -185,73 +220,220 @@ class TaskManager {
         cleaned = cleaned.replace(/\d{1,2}-\d{1,2}-\d{4}/g, '');
         cleaned = cleaned.replace(/\d{4}-\d{1,2}-\d{1,2}/g, '');
         cleaned = cleaned.replace(/\bin \d+ (day|days|week|weeks)\b/gi, '');
+        cleaned = cleaned.replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/gi, '');
+        cleaned = cleaned.replace(/\bby\s+/gi, '');
 
-        // Remove stress level indicators
-        cleaned = cleaned.replace(/\b(high|medium|low|urgent|critical|easy|simple|light|stressful|panic|extreme|severe|intense|overwhelming|difficult|hard|challenging|demanding|moderate|normal|average|important|minor|trivial|relaxed|calm|chill|casual|quick|routine)\s*(stress)?\b/gi, '');
-
-        // Remove extra dashes and whitespace
-        cleaned = cleaned.replace(/\s*-\s*/g, ' ');
+        // Clean up whitespace
         cleaned = cleaned.replace(/\s+/g, ' ');
         cleaned = cleaned.trim();
 
         return cleaned;
     }
 
-    addTask() {
-        const input = document.getElementById('taskInput');
-        const taskText = input.value.trim();
+    // Show confirmation modal
+    showConfirmationModal() {
+        const modal = document.getElementById('confirmationModal');
+        const container = document.getElementById('parsedItems');
 
-        if (!taskText) return;
+        container.innerHTML = this.pendingItems.map(item => `
+            <div class="parsed-item">
+                <div class="item-text">${this.escapeHtml(item.cleanText)}</div>
+                <div class="item-meta">
+                    ${item.date ? `<span class="date-tag">${this.formatDate(item.date)}</span>` : ''}
+                </div>
+                <div class="category-selector">
+                    <label>
+                        <input type="radio" name="category-${item.id}" value="todo"
+                               ${item.category === 'todo' ? 'checked' : ''}>
+                        To-Do
+                    </label>
+                    <label>
+                        <input type="radio" name="category-${item.id}" value="habit"
+                               ${item.category === 'habit' ? 'checked' : ''}>
+                        Habit
+                    </label>
+                    <label>
+                        <input type="radio" name="category-${item.id}" value="calendar"
+                               ${item.category === 'calendar' ? 'checked' : ''}>
+                        Calendar
+                    </label>
+                    <label>
+                        <input type="radio" name="category-${item.id}" value="skip">
+                        Skip
+                    </label>
+                </div>
+            </div>
+        `).join('');
 
-        const date = this.parseDate(taskText);
-        const stressLevel = this.parseStressLevel(taskText);
-        const cleanText = this.cleanTaskText(taskText);
-
-        const task = {
-            id: Date.now(),
-            text: cleanText,
-            date: date ? date.toISOString() : null,
-            stressLevel: stressLevel,
-            created: new Date().toISOString()
-        };
-
-        this.tasks.push(task);
-        this.saveTasks();
-        this.renderCalendar();
-        this.renderTodoList();
-
-        input.value = '';
+        modal.style.display = 'flex';
     }
 
-    deleteTask(taskId) {
-        this.tasks = this.tasks.filter(task => task.id !== taskId);
-        this.saveTasks();
-        this.renderCalendar();
+    closeModal() {
+        document.getElementById('confirmationModal').style.display = 'none';
+        this.pendingItems = [];
+    }
+
+    confirmItems() {
+        // Get selected categories for each item
+        this.pendingItems.forEach(item => {
+            const selectedCategory = document.querySelector(`input[name="category-${item.id}"]:checked`);
+            if (selectedCategory && selectedCategory.value !== 'skip') {
+                const category = selectedCategory.value;
+
+                if (category === 'todo') {
+                    this.todos.push({
+                        id: item.id,
+                        text: item.cleanText,
+                        completed: false,
+                        created: new Date().toISOString()
+                    });
+                } else if (category === 'habit') {
+                    // Check if habit already exists
+                    const existingHabit = this.habits.find(h =>
+                        h.text.toLowerCase() === item.cleanText.toLowerCase()
+                    );
+
+                    if (!existingHabit) {
+                        this.habits.push({
+                            id: item.id,
+                            text: item.cleanText,
+                            completions: {},
+                            created: new Date().toISOString()
+                        });
+                    }
+                } else if (category === 'calendar') {
+                    this.calendarItems.push({
+                        id: item.id,
+                        text: item.cleanText,
+                        date: item.date ? item.date.toISOString() : new Date().toISOString(),
+                        completed: false,
+                        created: new Date().toISOString()
+                    });
+                }
+            }
+        });
+
+        this.saveAll();
+        this.renderAll();
+        this.closeModal();
+    }
+
+    // Toggle todo completion
+    toggleTodo(id) {
+        const todo = this.todos.find(t => t.id === id);
+        if (todo) {
+            todo.completed = !todo.completed;
+            if (todo.completed) {
+                todo.completedDate = new Date().toISOString();
+            } else {
+                delete todo.completedDate;
+            }
+            this.saveData('todos', this.todos);
+            this.renderTodoList();
+        }
+    }
+
+    // Delete todo
+    deleteTodo(id) {
+        this.todos = this.todos.filter(t => t.id !== id);
+        this.saveData('todos', this.todos);
         this.renderTodoList();
     }
 
+    // Toggle habit completion for today
+    toggleHabit(id) {
+        const habit = this.habits.find(h => h.id === id);
+        if (habit) {
+            const today = new Date().toISOString().split('T')[0];
+            habit.completions[today] = !habit.completions[today];
+            this.saveData('habits', this.habits);
+            this.renderHabitList();
+        }
+    }
+
+    // Delete habit
+    deleteHabit(id) {
+        this.habits = this.habits.filter(h => h.id !== id);
+        this.saveData('habits', this.habits);
+        this.renderHabitList();
+    }
+
+    // Toggle calendar item completion
+    toggleCalendarItem(id) {
+        const item = this.calendarItems.find(i => i.id === id);
+        if (item) {
+            item.completed = !item.completed;
+            if (item.completed) {
+                item.completedDate = new Date().toISOString();
+            } else {
+                delete item.completedDate;
+            }
+            this.saveData('calendarItems', this.calendarItems);
+            this.renderCalendar();
+        }
+    }
+
+    // Delete calendar item
+    deleteCalendarItem(id) {
+        this.calendarItems = this.calendarItems.filter(i => i.id !== id);
+        this.saveData('calendarItems', this.calendarItems);
+        this.renderCalendar();
+    }
+
+    // Render all sections
+    renderAll() {
+        this.renderTodoList();
+        this.renderHabitList();
+        this.renderCalendar();
+        this.renderDumpHistory();
+    }
+
+    // Render to-do list
     renderTodoList() {
-        const todoList = document.getElementById('todoList');
-        const undatedTasks = this.tasks.filter(task => !task.date);
+        const container = document.getElementById('todoList');
+        const activeTodos = this.todos.filter(t => !t.completed);
 
-        if (undatedTasks.length === 0) {
-            todoList.innerHTML = '<div class="empty-state">No tasks yet. Add some!</div>';
+        if (activeTodos.length === 0) {
+            container.innerHTML = '<div class="empty-state">No tasks yet</div>';
             return;
         }
 
-        todoList.innerHTML = undatedTasks.map(task => `
-            <div class="task-item ${task.stressLevel}">
-                <div class="task-text">${this.escapeHtml(task.text)}</div>
-                <button class="delete-btn" onclick="taskManager.deleteTask(${task.id})">×</button>
+        container.innerHTML = activeTodos.map(todo => `
+            <div class="todo-item">
+                <input type="checkbox" id="todo-${todo.id}"
+                       onchange="app.toggleTodo(${todo.id})">
+                <label for="todo-${todo.id}">${this.escapeHtml(todo.text)}</label>
+                <button class="delete-btn" onclick="app.deleteTodo(${todo.id})">×</button>
             </div>
         `).join('');
     }
 
+    // Render habit tracker
+    renderHabitList() {
+        const container = document.getElementById('habitList');
+        const today = new Date().toISOString().split('T')[0];
+
+        if (this.habits.length === 0) {
+            container.innerHTML = '<div class="empty-state">No habits yet</div>';
+            return;
+        }
+
+        container.innerHTML = this.habits.map(habit => `
+            <div class="habit-item">
+                <input type="checkbox" id="habit-${habit.id}"
+                       ${habit.completions[today] ? 'checked' : ''}
+                       onchange="app.toggleHabit(${habit.id})">
+                <label for="habit-${habit.id}">${this.escapeHtml(habit.text)}</label>
+                <button class="delete-btn" onclick="app.deleteHabit(${habit.id})">×</button>
+            </div>
+        `).join('');
+    }
+
+    // Render calendar
     renderCalendar() {
         const year = this.currentDate.getFullYear();
         const month = this.currentDate.getMonth();
 
-        // Update month display
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                            'July', 'August', 'September', 'October', 'November', 'December'];
         document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
@@ -284,21 +466,24 @@ class TaskManager {
             currentDay.setHours(0, 0, 0, 0);
             const isToday = currentDay.getTime() === today.getTime();
 
-            const dayTasks = this.tasks.filter(task => {
-                if (!task.date) return false;
-                const taskDate = new Date(task.date);
-                taskDate.setHours(0, 0, 0, 0);
-                return taskDate.getTime() === currentDay.getTime();
+            const dayItems = this.calendarItems.filter(item => {
+                if (!item.date) return false;
+                const itemDate = new Date(item.date);
+                itemDate.setHours(0, 0, 0, 0);
+                return itemDate.getTime() === currentDay.getTime();
             });
 
             html += `
                 <div class="calendar-day ${isToday ? 'today' : ''}">
                     <div class="day-number">${day}</div>
-                    <div class="day-tasks">
-                        ${dayTasks.map(task => `
-                            <div class="task-item ${task.stressLevel}">
-                                <div class="task-text">${this.escapeHtml(task.text)}</div>
-                                <button class="delete-btn" onclick="taskManager.deleteTask(${task.id})">×</button>
+                    <div class="day-items">
+                        ${dayItems.map(item => `
+                            <div class="calendar-item ${item.completed ? 'completed' : ''}">
+                                <input type="checkbox" id="cal-${item.id}"
+                                       ${item.completed ? 'checked' : ''}
+                                       onchange="app.toggleCalendarItem(${item.id})">
+                                <label for="cal-${item.id}">${this.escapeHtml(item.text)}</label>
+                                <button class="delete-btn" onclick="app.deleteCalendarItem(${item.id})">×</button>
                             </div>
                         `).join('')}
                     </div>
@@ -316,9 +501,49 @@ class TaskManager {
         calendar.innerHTML = html;
     }
 
+    // Render brain dump history
+    renderDumpHistory() {
+        const container = document.getElementById('dumpHistory');
+
+        if (this.dumpHistory.length === 0) {
+            container.innerHTML = '<div class="empty-state">No history yet</div>';
+            return;
+        }
+
+        container.innerHTML = this.dumpHistory.map(dump => `
+            <div class="dump-entry">
+                <div class="dump-date">${this.formatDateTime(new Date(dump.date))}</div>
+                <div class="dump-text">${this.escapeHtml(dump.text)}</div>
+            </div>
+        `).join('');
+    }
+
     changeMonth(direction) {
         this.currentDate.setMonth(this.currentDate.getMonth() + direction);
         this.renderCalendar();
+    }
+
+    formatDate(date) {
+        const d = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        if (d.toDateString() === today.toDateString()) return 'Today';
+        if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    formatDateTime(date) {
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
     }
 
     escapeHtml(text) {
@@ -327,15 +552,21 @@ class TaskManager {
         return div.innerHTML;
     }
 
-    saveTasks() {
-        localStorage.setItem('tasks', JSON.stringify(this.tasks));
+    saveAll() {
+        this.saveData('todos', this.todos);
+        this.saveData('habits', this.habits);
+        this.saveData('calendarItems', this.calendarItems);
     }
 
-    loadTasks() {
-        const saved = localStorage.getItem('tasks');
-        return saved ? JSON.parse(saved) : [];
+    saveData(key, data) {
+        localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    loadData(key) {
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
     }
 }
 
 // Initialize the app
-const taskManager = new TaskManager();
+const app = new BrainDumpApp();

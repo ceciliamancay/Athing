@@ -3,29 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager & Calendar</title>
+    <title>Morning Brain Dump</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Task Manager</h1>
+            <h1>Morning Brain Dump</h1>
             <div class="input-section">
-                <input type="text" id="taskInput" placeholder="Enter a task... (e.g., 'Finish report tomorrow - high stress')">
-                <button id="addTaskBtn">Add Task</button>
-            </div>
-            <div class="legend">
-                <span class="legend-item"><span class="dot low"></span> Low Stress</span>
-                <span class="legend-item"><span class="dot medium"></span> Medium Stress</span>
-                <span class="legend-item"><span class="dot high"></span> High Stress</span>
+                <textarea id="brainDumpInput" placeholder="Write your morning brain dump here...
+
+Example:
+Need to finish the report by Friday. Also gym today and remember to read for 30 mins.
+Meeting with Sarah at 3pm tomorrow. Buy groceries. Start working on the project proposal next week."></textarea>
+                <button id="parseDumpBtn">Parse & Add</button>
             </div>
         </header>
 
         <div class="main-content">
             <aside class="sidebar">
-                <h2>To-Do List</h2>
-                <div id="todoList" class="todo-list">
-                    <!-- Undated tasks will appear here -->
+                <div class="section">
+                    <h2>Habit Tracker</h2>
+                    <div id="habitList" class="habit-list">
+                        <!-- Habits will appear here -->
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>To-Do List</h2>
+                    <div id="todoList" class="todo-list">
+                        <!-- Tasks will appear here -->
+                    </div>
                 </div>
             </aside>
 
@@ -39,6 +47,28 @@
                     <!-- Calendar will be generated here -->
                 </div>
             </main>
+        </div>
+
+        <div class="history-section">
+            <h3>Brain Dump History</h3>
+            <div id="dumpHistory" class="dump-history">
+                <!-- History will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <h2>Confirm Your Items</h2>
+            <p>Review the parsed items and assign them to categories:</p>
+            <div id="parsedItems" class="parsed-items">
+                <!-- Parsed items will appear here -->
+            </div>
+            <div class="modal-actions">
+                <button id="confirmBtn" class="btn-primary">Confirm All</button>
+                <button id="cancelBtn" class="btn-secondary">Cancel</button>
+            </div>
         </div>
     </div>
 
