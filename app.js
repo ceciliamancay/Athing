@@ -165,7 +165,7 @@ class BrainDumpApp {
             return {
                 id: Date.now() + index,
                 text: originalText,
-                cleanText: this.cleanItemText(item),
+                cleanText: this.cleanItemText(item, habitInfo),  // Pass habitInfo for simplification
                 date: date,
                 time: time,
                 category: this.suggestCategory(item, date, time, habitInfo),
@@ -179,47 +179,33 @@ class BrainDumpApp {
         this.renderDumpHistory();
     }
 
-    // Remove common filler phrases and emotional commentary
+    // Remove common filler phrases - deterministic word list
     removeFillerPhrases(text) {
-        const fillerPatterns = [
-            // Leading filler words
-            /^(okay|alright|so|um|uh|well|like|oh|ah)\s*,?\s*/i,
-            // Mental state phrases
-            /\b(I got this|I think|I guess|I believe|I feel like|I suppose)\b/gi,
-            // Uncertainty markers
-            /\b(maybe|perhaps|probably|possibly|hopefully|ideally)\b/gi,
-            // Emotional commentary
-            /\b(luckily|unfortunately|sadly|honestly|frankly|seriously)\b/gi,
-            // Verbal fillers
-            /\b(basically|literally|actually|really|just|simply)\b/gi,
-            /\b(you know|I mean|kind of|sort of|like|right)\b/gi,
-            // Action intention phrases
-            /\b(I need to|I should|I have to|I must|I ought to|I want to|I'd like to|I would like to|remember to|don't forget to)\b/gi,
-            // Informal contractions
-            /\b(gonna|gotta|wanna|hafta|shoulda|coulda|woulda)\b/gi,
-            // Redundant transition words at start
-            /^(and|but|or|then|also|plus)\s+/i,
-            // Normalize whitespace and punctuation
-            /\s*,\s*,\s*/g,  // double commas
-            /\s+/g  // normalize whitespace
+        // Deterministic list of words/phrases to always remove
+        const wordsToRemove = [
+            'I', 'need to', 'have to', 'should', 'remember to',
+            'I think', 'maybe', 'probably', 'okay', 'so', 'well',
+            'like', 'literally', 'basically'
         ];
 
         let cleaned = text;
-        fillerPatterns.forEach(pattern => {
-            if (pattern.source === '\\s+') {
-                cleaned = cleaned.replace(pattern, ' ');
-            } else if (pattern.source === '\\s*,\\s*,\\s*') {
-                cleaned = cleaned.replace(pattern, ',');
-            } else {
-                cleaned = cleaned.replace(pattern, '');
-            }
+
+        // Remove each word/phrase (case-insensitive, word boundaries)
+        wordsToRemove.forEach(word => {
+            // Escape special regex characters in the word
+            const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Create pattern with word boundaries
+            const pattern = new RegExp(`\\b${escapedWord}\\b`, 'gi');
+            cleaned = cleaned.replace(pattern, '');
         });
 
-        // Clean up leftover punctuation/spacing issues
+        // Clean up whitespace and punctuation
+        cleaned = cleaned.replace(/\s+/g, ' ');  // normalize whitespace
         cleaned = cleaned.replace(/\s+,/g, ',');  // space before comma
         cleaned = cleaned.replace(/,\s*$/g, '');  // trailing comma
         cleaned = cleaned.replace(/^\s*,\s*/g, '');  // leading comma
         cleaned = cleaned.replace(/\s+\./g, '.');  // space before period
+        cleaned = cleaned.replace(/^,\s*/g, '');   // leading comma after word removal
 
         return cleaned.trim();
     }
@@ -292,36 +278,62 @@ class BrainDumpApp {
         return null;
     }
 
-    // Detect specific habits and categorize workout mentions
+    // Detect specific habits and categorize with deterministic keyword detection
     detectHabit(text) {
         const lowerText = text.toLowerCase();
-
-        // Fixed daily habits: Meds, Cat Teeth, Sports, Read
-        const fixedHabits = {
-            meds: /\b(meds?|medication|pill|prescription)\b/i,
-            catTeeth: /\b(cat'?s?\s*(teeth|tooth|dental|brush))\b/i,
-            sports: /\b(sports?|gym|workout|exercise|yoga|running?|jog|swim|bike|cycling)\b/i,
-            read: /\b(read|reading|book)\b/i
-        };
 
         const detected = {
             isFixedHabit: false,
             habitType: null,
-            isWorkout: false
+            isWorkout: false,
+            simplifiedText: null,  // Store simplified text for this habit
+            isMeeting: false,      // Special flag for meetings
+            meetingName: null      // Store name for meetings
         };
 
-        // Check for fixed habits
-        for (let [habitType, pattern] of Object.entries(fixedHabits)) {
-            if (pattern.test(lowerText)) {
-                detected.isFixedHabit = true;
-                detected.habitType = habitType;
+        // Keyword detection for categories (deterministic rules)
 
-                // Special case: sports/workout mentions
-                if (habitType === 'sports') {
-                    detected.isWorkout = true;
-                }
-                break;
-            }
+        // 1. Gym/yoga/run/workout/exercise → "Gym" + Sports habit
+        if (/\b(gym|yoga|run|running|workout|exercise)\b/i.test(text)) {
+            detected.isFixedHabit = true;
+            detected.habitType = 'sports';
+            detected.isWorkout = true;
+            detected.simplifiedText = 'Gym';
+            return detected;
+        }
+
+        // 2. Read/book/article → "Reading" + Read habit
+        if (/\b(read|reading|book|article)\b/i.test(text)) {
+            detected.isFixedHabit = true;
+            detected.habitType = 'read';
+            detected.simplifiedText = 'Reading';
+            return detected;
+        }
+
+        // 3. Meds/medicine/pills → "Meds" + Meds habit
+        if (/\b(meds?|medicine|pills?)\b/i.test(text)) {
+            detected.isFixedHabit = true;
+            detected.habitType = 'meds';
+            detected.simplifiedText = 'Meds';
+            return detected;
+        }
+
+        // 4. Meeting/meet/coffee with [name] → "Meet [name]"
+        const meetingPattern = /\b(meeting|meet|coffee)\s+with\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i;
+        const meetingMatch = text.match(meetingPattern);
+        if (meetingMatch) {
+            detected.isMeeting = true;
+            detected.meetingName = meetingMatch[2];
+            detected.simplifiedText = `Meet ${meetingMatch[2]}`;
+            return detected;
+        }
+
+        // Legacy: Cat teeth (keeping for backwards compatibility)
+        if (/\b(cat'?s?\s*(teeth|tooth|dental|brush))\b/i.test(text)) {
+            detected.isFixedHabit = true;
+            detected.habitType = 'catTeeth';
+            detected.simplifiedText = 'Cat Teeth';
+            return detected;
         }
 
         return detected;
@@ -333,39 +345,43 @@ class BrainDumpApp {
         return habitInfo.isFixedHabit;
     }
 
-    // Suggest a category based on the text
+    // Suggest a category based on the text (deterministic rules)
     suggestCategory(text, date, time, habitInfo) {
         const lowerText = text.toLowerCase();
 
-        // Check for specific timed events (meetings, classes, appointments)
+        // 1. Meetings always go to calendar
+        if (habitInfo.isMeeting) {
+            return 'calendar';
+        }
+
+        // 2. Check for specific timed events (meetings, classes, appointments)
         const timedEventKeywords = /\b(meeting|class|appointment|call|conference|session|lecture)\b/i;
         if (timedEventKeywords.test(lowerText) && (date || time)) {
             return 'calendar';
         }
 
-        // Workouts/exercises logic:
+        // 3. Workouts/exercises logic:
         // - If there's a time → Calendar
-        // - If no time → To-Do
-        // - Sports habit will be checked separately in the UI
+        // - If no time → Habit (changed from To-Do to Habit for consistency)
         if (habitInfo.isWorkout) {
             if (time || date) {
                 return 'calendar';
             } else {
-                return 'todo';
+                return 'habit';  // Sports go to habits
             }
         }
 
-        // Fixed daily habits (Meds, Cat Teeth, Sports, Read) → Habits
-        if (habitInfo.isFixedHabit && habitInfo.habitType !== 'sports') {
+        // 4. Fixed daily habits (Meds, Read) → Habits
+        if (habitInfo.isFixedHabit) {
             return 'habit';
         }
 
-        // Events with dates/times → Calendar
+        // 5. Events with dates/times → Calendar
         if (date || time) {
             return 'calendar';
         }
 
-        // Everything else → To-Do
+        // 6. Everything else → To-Do
         return 'todo';
     }
 
@@ -488,8 +504,13 @@ class BrainDumpApp {
         return null;
     }
 
-    // Clean up item text - remove date/time info and unnecessary words
-    cleanItemText(text) {
+    // Clean up item text - deterministic max 4 words algorithm
+    cleanItemText(text, habitInfo = null) {
+        // If this is a detected habit/meeting with simplified text, use that
+        if (habitInfo && habitInfo.simplifiedText) {
+            return habitInfo.simplifiedText;
+        }
+
         let cleaned = text;
 
         // Remove common date patterns
@@ -508,30 +529,40 @@ class BrainDumpApp {
         cleaned = cleaned.replace(/\b(in the )?(morning|afternoon|evening|night)\b/gi, '');
         cleaned = cleaned.replace(/\b(this|next)\s+(morning|afternoon|evening|night)\b/gi, '');
 
-        // Remove unnecessary leading phrases (double check after removeFillerPhrases)
-        cleaned = cleaned.replace(/^(I need to|I should|I have to|I must|I ought to|I want to|I'd like to|I would like to|remember to|don't forget to)\s+/gi, '');
-
-        // Remove question marks if it's a task (keep for reflections)
-        if (!/\b(why|what|when|where|who|how)\b/i.test(cleaned)) {
-            cleaned = cleaned.replace(/\?/g, '');
-        }
-
-        // Simplify common action verbs to imperative form
+        // Remove action intention phrases
         cleaned = cleaned.replace(/^(I will|I'll|I am going to|I'm going to)\s+/gi, '');
+
+        // Remove stopwords (additional common words)
+        const stopwords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+                          'of', 'with', 'from', 'up', 'about', 'into', 'through', 'during'];
+        stopwords.forEach(word => {
+            const pattern = new RegExp(`\\b${word}\\b`, 'gi');
+            cleaned = cleaned.replace(pattern, '');
+        });
+
+        // Clean up whitespace
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+        // Max 4 words algorithm: keep only [name] + [action verb] + [object]
+        const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+
+        if (words.length > 4) {
+            // Keep first 4 meaningful words
+            cleaned = words.slice(0, 4).join(' ');
+        } else {
+            cleaned = words.join(' ');
+        }
 
         // Capitalize first letter
         if (cleaned.length > 0) {
             cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
         }
 
-        // Clean up whitespace and punctuation
-        cleaned = cleaned.replace(/\s+/g, ' ');
-        cleaned = cleaned.replace(/\s+,/g, ',');
+        // Clean up final punctuation
         cleaned = cleaned.replace(/,\s*$/g, '');
         cleaned = cleaned.replace(/^\s*,\s*/g, '');
-        cleaned = cleaned.trim();
 
-        return cleaned;
+        return cleaned.trim();
     }
 
     // Show confirmation modal with editing capabilities
