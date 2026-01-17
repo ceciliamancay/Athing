@@ -5,9 +5,12 @@ class BrainDumpApp {
         this.habits = this.loadData('habits') || [];
         this.calendarItems = this.loadData('calendarItems') || [];
         this.dumpHistory = this.loadData('dumpHistory') || [];
+        this.eveningReflections = this.loadData('eveningReflections') || [];
         this.currentDate = new Date();
         this.pendingItems = [];
         this.currentTimeOfDay = this.loadData('timeOfDay') || this.detectTimeOfDay();
+        this.selectedScheduleDate = new Date();
+        this.selectedScheduleDate.setHours(0, 0, 0, 0);
         this.init();
     }
 
@@ -83,6 +86,34 @@ class BrainDumpApp {
                 this.closeModal();
             }
         });
+
+        // Daily schedule date selector buttons
+        document.querySelectorAll('.date-quick-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const offset = parseInt(btn.dataset.offset);
+                const newDate = new Date();
+                newDate.setDate(newDate.getDate() + offset);
+                newDate.setHours(0, 0, 0, 0);
+                this.setScheduleDate(newDate);
+
+                // Update active button
+                document.querySelectorAll('.date-quick-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        // Custom date picker
+        const customDatePicker = document.getElementById('customDatePicker');
+        customDatePicker.addEventListener('change', () => {
+            if (customDatePicker.value) {
+                const newDate = new Date(customDatePicker.value);
+                newDate.setHours(0, 0, 0, 0);
+                this.setScheduleDate(newDate);
+
+                // Remove active from quick buttons
+                document.querySelectorAll('.date-quick-btn').forEach(b => b.classList.remove('active'));
+            }
+        });
     }
 
     // Parse the brain dump text into structured items
@@ -92,13 +123,26 @@ class BrainDumpApp {
 
         if (!text) return;
 
-        // Save to history
-        this.dumpHistory.unshift({
+        // Save to history - separate evening reflections from regular prompts
+        const historyEntry = {
             id: Date.now(),
             date: new Date().toISOString(),
             text: text
-        });
-        this.saveData('dumpHistory', this.dumpHistory);
+        };
+
+        if (this.currentTimeOfDay === 'evening') {
+            // Save as evening reflection (keep all)
+            this.eveningReflections.unshift(historyEntry);
+            this.saveData('eveningReflections', this.eveningReflections);
+        } else {
+            // Save as regular prompt (limit to 10)
+            this.dumpHistory.unshift(historyEntry);
+            // Keep only the 10 most recent
+            if (this.dumpHistory.length > 10) {
+                this.dumpHistory = this.dumpHistory.slice(0, 10);
+            }
+            this.saveData('dumpHistory', this.dumpHistory);
+        }
 
         // Split text into sentences/items
         let sentences = text.split(/[.!?\n]+/).filter(s => s.trim().length > 0);
@@ -138,12 +182,25 @@ class BrainDumpApp {
     // Remove common filler phrases and emotional commentary
     removeFillerPhrases(text) {
         const fillerPatterns = [
-            /^(okay|alright|so|um|uh|well|like)\s*,?\s*/i,
-            /\b(I got this|I think|I guess|maybe|perhaps|probably|hopefully)\b/gi,
-            /\b(luckily|unfortunately|sadly|honestly|basically|literally)\b/gi,
-            /\b(you know|I mean|kind of|sort of)\b/gi,
-            /\b(I need to|I should|I have to|I must|I want to|I'd like to|remember to)\b/gi,
-            /\b(gonna|gotta|wanna)\b/gi,
+            // Leading filler words
+            /^(okay|alright|so|um|uh|well|like|oh|ah)\s*,?\s*/i,
+            // Mental state phrases
+            /\b(I got this|I think|I guess|I believe|I feel like|I suppose)\b/gi,
+            // Uncertainty markers
+            /\b(maybe|perhaps|probably|possibly|hopefully|ideally)\b/gi,
+            // Emotional commentary
+            /\b(luckily|unfortunately|sadly|honestly|frankly|seriously)\b/gi,
+            // Verbal fillers
+            /\b(basically|literally|actually|really|just|simply)\b/gi,
+            /\b(you know|I mean|kind of|sort of|like|right)\b/gi,
+            // Action intention phrases
+            /\b(I need to|I should|I have to|I must|I ought to|I want to|I'd like to|I would like to|remember to|don't forget to)\b/gi,
+            // Informal contractions
+            /\b(gonna|gotta|wanna|hafta|shoulda|coulda|woulda)\b/gi,
+            // Redundant transition words at start
+            /^(and|but|or|then|also|plus)\s+/i,
+            // Normalize whitespace and punctuation
+            /\s*,\s*,\s*/g,  // double commas
             /\s+/g  // normalize whitespace
         ];
 
@@ -151,10 +208,18 @@ class BrainDumpApp {
         fillerPatterns.forEach(pattern => {
             if (pattern.source === '\\s+') {
                 cleaned = cleaned.replace(pattern, ' ');
+            } else if (pattern.source === '\\s*,\\s*,\\s*') {
+                cleaned = cleaned.replace(pattern, ',');
             } else {
                 cleaned = cleaned.replace(pattern, '');
             }
         });
+
+        // Clean up leftover punctuation/spacing issues
+        cleaned = cleaned.replace(/\s+,/g, ',');  // space before comma
+        cleaned = cleaned.replace(/,\s*$/g, '');  // trailing comma
+        cleaned = cleaned.replace(/^\s*,\s*/g, '');  // leading comma
+        cleaned = cleaned.replace(/\s+\./g, '.');  // space before period
 
         return cleaned.trim();
     }
@@ -429,7 +494,7 @@ class BrainDumpApp {
 
         // Remove common date patterns
         cleaned = cleaned.replace(/\b(today|tomorrow|yesterday)\b/gi, '');
-        cleaned = cleaned.replace(/\b(next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|week)\b/gi, '');
+        cleaned = cleaned.replace(/\b(next|this|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b/gi, '');
         cleaned = cleaned.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(st|nd|rd|th)?\b/gi, '');
         cleaned = cleaned.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}(st|nd|rd|th)?\b/gi, '');
         cleaned = cleaned.replace(/\d{1,2}\/\d{1,2}\/\d{4}/g, '');
@@ -437,18 +502,33 @@ class BrainDumpApp {
         cleaned = cleaned.replace(/\d{4}-\d{1,2}-\d{1,2}/g, '');
         cleaned = cleaned.replace(/\bin \d+ (day|days|week|weeks)\b/gi, '');
         cleaned = cleaned.replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/gi, '');
-        cleaned = cleaned.replace(/\b(by|before|after)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '');
+        cleaned = cleaned.replace(/\b(by|before|after|around)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '');
 
-        // Remove unnecessary leading phrases (these should have been removed by removeFillerPhrases, but double check)
-        cleaned = cleaned.replace(/^(I need to|I should|I have to|I must|I want to|I'd like to|remember to)\s+/gi, '');
+        // Remove time-related phrases
+        cleaned = cleaned.replace(/\b(in the )?(morning|afternoon|evening|night)\b/gi, '');
+        cleaned = cleaned.replace(/\b(this|next)\s+(morning|afternoon|evening|night)\b/gi, '');
+
+        // Remove unnecessary leading phrases (double check after removeFillerPhrases)
+        cleaned = cleaned.replace(/^(I need to|I should|I have to|I must|I ought to|I want to|I'd like to|I would like to|remember to|don't forget to)\s+/gi, '');
+
+        // Remove question marks if it's a task (keep for reflections)
+        if (!/\b(why|what|when|where|who|how)\b/i.test(cleaned)) {
+            cleaned = cleaned.replace(/\?/g, '');
+        }
+
+        // Simplify common action verbs to imperative form
+        cleaned = cleaned.replace(/^(I will|I'll|I am going to|I'm going to)\s+/gi, '');
 
         // Capitalize first letter
         if (cleaned.length > 0) {
             cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
         }
 
-        // Clean up whitespace
+        // Clean up whitespace and punctuation
         cleaned = cleaned.replace(/\s+/g, ' ');
+        cleaned = cleaned.replace(/\s+,/g, ',');
+        cleaned = cleaned.replace(/,\s*$/g, '');
+        cleaned = cleaned.replace(/^\s*,\s*/g, '');
         cleaned = cleaned.trim();
 
         return cleaned;
@@ -678,6 +758,7 @@ class BrainDumpApp {
                     this.todos.push({
                         id: item.id,
                         text: editedText,
+                        originalText: item.text,
                         completed: false,
                         created: new Date().toISOString()
                     });
@@ -691,6 +772,7 @@ class BrainDumpApp {
                         this.habits.push({
                             id: item.id,
                             text: editedText,
+                            originalText: item.text,
                             completions: {},
                             created: new Date().toISOString()
                         });
@@ -699,6 +781,7 @@ class BrainDumpApp {
                     this.calendarItems.push({
                         id: item.id,
                         text: editedText,
+                        originalText: item.text,
                         date: finalDate ? finalDate.toISOString() : new Date().toISOString(),
                         completed: false,
                         created: new Date().toISOString()
@@ -811,6 +894,150 @@ class BrainDumpApp {
         this.renderHabitList();
         this.renderCalendar();
         this.renderDumpHistory();
+        this.renderDailySchedule();
+    }
+
+    // Set the selected date for daily schedule view
+    setScheduleDate(date) {
+        this.selectedScheduleDate = new Date(date);
+        this.selectedScheduleDate.setHours(0, 0, 0, 0);
+        this.renderDailySchedule();
+    }
+
+    // Render daily schedule view
+    renderDailySchedule() {
+        const selectedDate = this.selectedScheduleDate;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // Update date display
+        const dateDisplay = document.getElementById('scheduleDateDisplay');
+        if (selectedDate.getTime() === today.getTime()) {
+            dateDisplay.textContent = 'Today';
+        } else if (selectedDate.getTime() === tomorrow.getTime()) {
+            dateDisplay.textContent = 'Tomorrow';
+        } else {
+            dateDisplay.textContent = selectedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // Render calendar events for selected date
+        const calendarContainer = document.getElementById('scheduleCalendarItems');
+        const selectedDateStr = selectedDate.toISOString().split('T')[0];
+        const calendarEvents = this.calendarItems.filter(item => {
+            if (!item.date) return false;
+            const itemDate = new Date(item.date);
+            itemDate.setHours(0, 0, 0, 0);
+            return itemDate.getTime() === selectedDate.getTime();
+        }).sort((a, b) => {
+            const timeA = new Date(a.date).getTime();
+            const timeB = new Date(b.date).getTime();
+            return timeA - timeB;
+        });
+
+        if (calendarEvents.length === 0) {
+            calendarContainer.innerHTML = '<div class="schedule-empty">No events scheduled ✨</div>';
+        } else {
+            calendarContainer.innerHTML = calendarEvents.map(item => {
+                const itemDate = new Date(item.date);
+                const hasTime = itemDate.getHours() !== 0 || itemDate.getMinutes() !== 0;
+                const timeStr = hasTime
+                    ? itemDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                    : '';
+
+                return `
+                    <div class="schedule-item ${item.completed ? 'completed' : ''}"
+                         onclick="app.focusOnCalendarItem(${item.id})">
+                        ${timeStr ? `<span class="schedule-item-time">${timeStr}</span>` : ''}
+                        <span class="schedule-item-text">${this.escapeHtml(item.text)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render to-dos (active ones)
+        const todoContainer = document.getElementById('scheduleTodoItems');
+        const activeTodos = this.todos.filter(t => !t.completed);
+
+        if (activeTodos.length === 0) {
+            todoContainer.innerHTML = '<div class="schedule-empty">All clear! 🌸</div>';
+        } else {
+            todoContainer.innerHTML = activeTodos.map(todo => `
+                <div class="schedule-item ${todo.completed ? 'completed' : ''}"
+                     onclick="app.focusOnTodo(${todo.id})">
+                    <span class="schedule-item-text">${this.escapeHtml(todo.text)}</span>
+                </div>
+            `).join('');
+        }
+
+        // Render habits for selected date
+        const habitContainer = document.getElementById('scheduleHabitItems');
+
+        if (this.habits.length === 0) {
+            habitContainer.innerHTML = '<div class="schedule-empty">No habits yet 💭</div>';
+        } else {
+            habitContainer.innerHTML = this.habits.map(habit => {
+                const isCompleted = habit.completions[selectedDateStr];
+                return `
+                    <div class="schedule-item ${isCompleted ? 'completed' : ''}"
+                         onclick="app.focusOnHabit(${habit.id})">
+                        <span class="schedule-item-text">${this.escapeHtml(habit.text)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // Focus/scroll to a specific calendar item
+    focusOnCalendarItem(itemId) {
+        const item = this.calendarItems.find(c => c.id === itemId);
+        if (!item) return;
+
+        // Navigate to the month of the item
+        const itemDate = new Date(item.date);
+        this.currentDate = new Date(itemDate.getFullYear(), itemDate.getMonth(), 1);
+        this.renderCalendar();
+
+        // Scroll to and highlight the item
+        setTimeout(() => {
+            const element = document.querySelector(`[data-item-id="${itemId}"].calendar-item`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.style.background = 'rgba(216, 199, 233, 0.3)';
+                setTimeout(() => {
+                    element.style.background = '';
+                }, 2000);
+            }
+        }, 100);
+    }
+
+    // Focus/scroll to a specific todo
+    focusOnTodo(itemId) {
+        const element = document.querySelector(`[data-item-id="${itemId}"].todo-item`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.style.background = 'rgba(216, 199, 233, 0.3)';
+            setTimeout(() => {
+                element.style.background = '';
+            }, 2000);
+        }
+    }
+
+    // Focus/scroll to a specific habit
+    focusOnHabit(itemId) {
+        const element = document.querySelector(`[data-item-id="${itemId}"].habit-item`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.style.background = 'rgba(216, 199, 233, 0.3)';
+            setTimeout(() => {
+                element.style.background = '';
+            }, 2000);
+        }
     }
 
     // Render to-do list
@@ -824,11 +1051,20 @@ class BrainDumpApp {
         }
 
         container.innerHTML = activeTodos.map(todo => `
-            <div class="todo-item">
+            <div class="todo-item" data-item-id="${todo.id}">
                 <input type="checkbox" id="todo-${todo.id}"
                        onchange="app.toggleTodo(${todo.id})">
-                <label for="todo-${todo.id}">${this.escapeHtml(todo.text)}</label>
-                <button class="delete-btn" onclick="app.deleteTodo(${todo.id})">×</button>
+                <div class="item-content-wrapper">
+                    <div class="item-text-editable" contenteditable="true"
+                         onblur="app.updateItemText('todo', ${todo.id}, this.textContent)"
+                         onfocus="this.dataset.original = this.textContent">${this.escapeHtml(todo.text)}</div>
+                    ${todo.originalText ? `<div class="item-original-small">${this.escapeHtml(todo.originalText)}</div>` : ''}
+                </div>
+                <div class="item-actions">
+                    <button class="move-btn" onclick="app.moveItemToCategory('todo', ${todo.id}, 'habit')" title="Move to Habits">📋→✨</button>
+                    <button class="move-btn" onclick="app.moveItemToCategory('todo', ${todo.id}, 'calendar')" title="Move to Calendar">📋→📅</button>
+                    <button class="delete-btn" onclick="app.deleteTodo(${todo.id})">×</button>
+                </div>
             </div>
         `).join('');
     }
@@ -844,12 +1080,21 @@ class BrainDumpApp {
         }
 
         container.innerHTML = this.habits.map(habit => `
-            <div class="habit-item">
+            <div class="habit-item" data-item-id="${habit.id}">
                 <input type="checkbox" id="habit-${habit.id}"
                        ${habit.completions[today] ? 'checked' : ''}
                        onchange="app.toggleHabit(${habit.id})">
-                <label for="habit-${habit.id}">${this.escapeHtml(habit.text)}</label>
-                <button class="delete-btn" onclick="app.deleteHabit(${habit.id})">×</button>
+                <div class="item-content-wrapper">
+                    <div class="item-text-editable" contenteditable="true"
+                         onblur="app.updateItemText('habit', ${habit.id}, this.textContent)"
+                         onfocus="this.dataset.original = this.textContent">${this.escapeHtml(habit.text)}</div>
+                    ${habit.originalText ? `<div class="item-original-small">${this.escapeHtml(habit.originalText)}</div>` : ''}
+                </div>
+                <div class="item-actions">
+                    <button class="move-btn" onclick="app.moveItemToCategory('habit', ${habit.id}, 'todo')" title="Move to To-Do">✨→📋</button>
+                    <button class="move-btn" onclick="app.moveItemToCategory('habit', ${habit.id}, 'calendar')" title="Move to Calendar">✨→📅</button>
+                    <button class="delete-btn" onclick="app.deleteHabit(${habit.id})">×</button>
+                </div>
             </div>
         `).join('');
     }
@@ -899,18 +1144,34 @@ class BrainDumpApp {
             });
 
             html += `
-                <div class="calendar-day ${isToday ? 'today' : ''}">
+                <div class="calendar-day ${isToday ? 'today' : ''}" data-date="${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}">
                     <div class="day-number">${day}</div>
                     <div class="day-items">
-                        ${dayItems.map(item => `
-                            <div class="calendar-item ${item.completed ? 'completed' : ''}">
-                                <input type="checkbox" id="cal-${item.id}"
-                                       ${item.completed ? 'checked' : ''}
-                                       onchange="app.toggleCalendarItem(${item.id})">
-                                <label for="cal-${item.id}">${this.escapeHtml(item.text)}</label>
-                                <button class="delete-btn" onclick="app.deleteCalendarItem(${item.id})">×</button>
+                        ${dayItems.map(item => {
+                            const itemDate = new Date(item.date);
+                            const timeStr = itemDate.getHours() !== 0 || itemDate.getMinutes() !== 0
+                                ? itemDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                                : '';
+                            return `
+                            <div class="calendar-item ${item.completed ? 'completed' : ''}" data-item-id="${item.id}">
+                                <div class="calendar-item-header">
+                                    <input type="checkbox" id="cal-${item.id}"
+                                           ${item.completed ? 'checked' : ''}
+                                           onchange="app.toggleCalendarItem(${item.id})">
+                                    ${timeStr ? `<span class="item-time">${timeStr}</span>` : ''}
+                                </div>
+                                <div class="item-text-editable" contenteditable="true"
+                                     onblur="app.updateItemText('calendar', ${item.id}, this.textContent)"
+                                     onfocus="this.dataset.original = this.textContent">${this.escapeHtml(item.text)}</div>
+                                ${item.originalText ? `<div class="item-original-small">${this.escapeHtml(item.originalText)}</div>` : ''}
+                                <div class="calendar-item-actions">
+                                    <button class="edit-datetime-btn" onclick="app.editCalendarItemDateTime(${item.id})" title="Edit date/time">📅⏰</button>
+                                    <button class="move-btn-small" onclick="app.moveItemToCategory('calendar', ${item.id}, 'todo')" title="Move to To-Do">📅→📋</button>
+                                    <button class="move-btn-small" onclick="app.moveItemToCategory('calendar', ${item.id}, 'habit')" title="Move to Habits">📅→✨</button>
+                                    <button class="delete-btn" onclick="app.deleteCalendarItem(${item.id})">×</button>
+                                </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 </div>
             `;
@@ -930,17 +1191,40 @@ class BrainDumpApp {
     renderDumpHistory() {
         const container = document.getElementById('dumpHistory');
 
-        if (this.dumpHistory.length === 0) {
-            container.innerHTML = '<div class="empty-state">Your thoughts will gather here 💭</div>';
-            return;
+        let html = '';
+
+        // Regular prompts section (limited to 10)
+        if (this.dumpHistory.length > 0) {
+            html += '<div class="history-subsection">';
+            html += '<h4 class="history-subsection-title">💭 Recent Thoughts</h4>';
+            html += this.dumpHistory.map(dump => `
+                <div class="dump-entry">
+                    <div class="dump-date">${this.formatDateTime(new Date(dump.date))}</div>
+                    <div class="dump-text">${this.escapeHtml(dump.text)}</div>
+                </div>
+            `).join('');
+            html += '</div>';
         }
 
-        container.innerHTML = this.dumpHistory.map(dump => `
-            <div class="dump-entry">
-                <div class="dump-date">${this.formatDateTime(new Date(dump.date))}</div>
-                <div class="dump-text">${this.escapeHtml(dump.text)}</div>
-            </div>
-        `).join('');
+        // Evening reflections section (all reflections)
+        if (this.eveningReflections.length > 0) {
+            html += '<div class="history-subsection reflection-subsection">';
+            html += '<h4 class="history-subsection-title reflection-title">🌙 Evening Reflections</h4>';
+            html += '<p class="reflection-subtitle">A space for your thoughts, feelings, and the day\'s journey</p>';
+            html += this.eveningReflections.map(reflection => `
+                <div class="reflection-entry">
+                    <div class="reflection-date">${this.formatDateTime(new Date(reflection.date))}</div>
+                    <div class="reflection-text">${this.escapeHtml(reflection.text)}</div>
+                </div>
+            `).join('');
+            html += '</div>';
+        }
+
+        if (html === '') {
+            container.innerHTML = '<div class="empty-state">Your thoughts will gather here 💭</div>';
+        } else {
+            container.innerHTML = html;
+        }
     }
 
     changeMonth(direction) {
@@ -971,6 +1255,149 @@ class BrainDumpApp {
         });
     }
 
+    // Update item text when edited inline
+    updateItemText(category, itemId, newText) {
+        newText = newText.trim();
+        if (!newText) return;
+
+        let item;
+        if (category === 'todo') {
+            item = this.todos.find(t => t.id === itemId);
+        } else if (category === 'habit') {
+            item = this.habits.find(h => h.id === itemId);
+        } else if (category === 'calendar') {
+            item = this.calendarItems.find(c => c.id === itemId);
+        }
+
+        if (item && item.text !== newText) {
+            item.text = newText;
+            this.saveAll();
+        }
+    }
+
+    // Move item between categories
+    moveItemToCategory(fromCategory, itemId, toCategory) {
+        let item;
+
+        // Find and remove from source category
+        if (fromCategory === 'todo') {
+            const index = this.todos.findIndex(t => t.id === itemId);
+            if (index === -1) return;
+            item = this.todos[index];
+            this.todos.splice(index, 1);
+        } else if (fromCategory === 'habit') {
+            const index = this.habits.findIndex(h => h.id === itemId);
+            if (index === -1) return;
+            item = this.habits[index];
+            this.habits.splice(index, 1);
+        } else if (fromCategory === 'calendar') {
+            const index = this.calendarItems.findIndex(c => c.id === itemId);
+            if (index === -1) return;
+            item = this.calendarItems[index];
+            this.calendarItems.splice(index, 1);
+        }
+
+        // Add to destination category
+        if (toCategory === 'todo') {
+            this.todos.push({
+                id: item.id,
+                text: item.text,
+                originalText: item.originalText,
+                completed: item.completed || false,
+                created: item.created || new Date().toISOString()
+            });
+        } else if (toCategory === 'habit') {
+            // Check if habit already exists
+            const existingHabit = this.habits.find(h =>
+                h.text.toLowerCase() === item.text.toLowerCase()
+            );
+            if (!existingHabit) {
+                this.habits.push({
+                    id: item.id,
+                    text: item.text,
+                    originalText: item.originalText,
+                    completions: item.completions || {},
+                    created: item.created || new Date().toISOString()
+                });
+            }
+        } else if (toCategory === 'calendar') {
+            this.calendarItems.push({
+                id: item.id,
+                text: item.text,
+                originalText: item.originalText,
+                date: item.date || new Date().toISOString(),
+                completed: item.completed || false,
+                created: item.created || new Date().toISOString()
+            });
+        }
+
+        this.saveAll();
+        this.renderAll();
+    }
+
+    // Edit calendar item date and time
+    editCalendarItemDateTime(itemId) {
+        const item = this.calendarItems.find(c => c.id === itemId);
+        if (!item) return;
+
+        const currentDate = new Date(item.date);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const timeStr = `${String(currentDate.getHours()).padStart(2, '0')}:${String(currentDate.getMinutes()).padStart(2, '0')}`;
+
+        // Create a simple modal for editing
+        const modal = document.getElementById('confirmationModal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        modalContent.innerHTML = `
+            <h2>📅 Edit Date & Time</h2>
+            <p>Adjust the date and time for: <strong>${this.escapeHtml(item.text)}</strong></p>
+            <div class="date-time-editor">
+                <label>
+                    Date:
+                    <input type="date" id="editDate" value="${dateStr}">
+                </label>
+                <label>
+                    Time:
+                    <input type="time" id="editTime" value="${timeStr}">
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="app.saveCalendarDateTime(${itemId})">Save ✓</button>
+                <button class="btn-secondary" onclick="app.closeEditModal()">Cancel</button>
+            </div>
+        `;
+
+        modal.style.display = 'flex';
+    }
+
+    // Save edited calendar date/time
+    saveCalendarDateTime(itemId) {
+        const item = this.calendarItems.find(c => c.id === itemId);
+        if (!item) return;
+
+        const dateInput = document.getElementById('editDate');
+        const timeInput = document.getElementById('editTime');
+
+        if (dateInput.value) {
+            const newDate = new Date(dateInput.value);
+            if (timeInput.value) {
+                const [hours, minutes] = timeInput.value.split(':');
+                newDate.setHours(parseInt(hours), parseInt(minutes));
+            }
+            item.date = newDate.toISOString();
+        }
+
+        this.saveAll();
+        this.closeEditModal();
+        this.renderCalendar();
+    }
+
+    // Close edit modal
+    closeEditModal() {
+        const modal = document.getElementById('confirmationModal');
+        modal.style.display = 'none';
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -981,6 +1408,7 @@ class BrainDumpApp {
         this.saveData('todos', this.todos);
         this.saveData('habits', this.habits);
         this.saveData('calendarItems', this.calendarItems);
+        this.saveData('eveningReflections', this.eveningReflections);
     }
 
     saveData(key, data) {
