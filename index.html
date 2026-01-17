@@ -69,6 +69,41 @@ For example:
                     <!-- Calendar will be generated here -->
                 </div>
             </main>
+
+            <aside class="daily-schedule">
+                <div class="schedule-header">
+                    <h2>📅 Daily View</h2>
+                    <div class="date-selector">
+                        <button class="date-quick-btn active" data-offset="0" title="Today">Today</button>
+                        <button class="date-quick-btn" data-offset="1" title="Tomorrow">Tomorrow</button>
+                        <input type="date" id="customDatePicker" title="Pick a specific date">
+                    </div>
+                </div>
+                <div class="schedule-content">
+                    <div class="schedule-date-display" id="scheduleDateDisplay">Today</div>
+
+                    <div class="schedule-section">
+                        <h3>⏰ Calendar Events</h3>
+                        <div id="scheduleCalendarItems" class="schedule-items">
+                            <!-- Calendar items for selected day -->
+                        </div>
+                    </div>
+
+                    <div class="schedule-section">
+                        <h3>📋 To-Dos</h3>
+                        <div id="scheduleTodoItems" class="schedule-items">
+                            <!-- To-dos will appear here -->
+                        </div>
+                    </div>
+
+                    <div class="schedule-section">
+                        <h3>✨ Daily Habits</h3>
+                        <div id="scheduleHabitItems" class="schedule-items">
+                            <!-- Habits for selected day -->
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </div>
 
         <div class="history-section">
